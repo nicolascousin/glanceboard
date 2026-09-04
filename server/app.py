@@ -59,6 +59,7 @@ import json
 import os
 import random
 import re
+import secrets
 import time
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -104,6 +105,8 @@ except ImportError:
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 GMAIL_CREDENTIALS_FILE = "data/gmail_credentials.json"
 GMAIL_TOKEN_FILE = "data/gmail_token.json"
+GMAIL_REDIRECT_URI = os.environ.get("GLANCEBOARD_PUBLIC_URL", "").rstrip("/")
+GMAIL_OAUTH_FLOWS = {}
 
 # E-Ink Spectra 6 color palette (RGB)
 EINK_PALETTE = np.array([
@@ -2508,6 +2511,18 @@ def update_config(config: dict):
 
 # ─── Email OAuth Endpoints ──────────────────────────────────────
 
+def _gmail_redirect_uri(request: Request):
+    """Build the public OAuth callback URL, accounting for a reverse proxy."""
+    if GMAIL_REDIRECT_URI:
+        return f"{GMAIL_REDIRECT_URI}/api/email/callback"
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get(
+        "host", "localhost:8000"
+    )
+    forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+    scheme = forwarded_proto.split(",")[0].strip()
+    return f"{scheme}://{host}/api/email/callback"
+
 @app.get("/api/email/status")
 def email_status():
     """Check if Gmail email integration is available and authorised."""
@@ -2531,28 +2546,32 @@ def email_auth_url(request: Request):
         raise HTTPException(status_code=400, detail="Gmail credentials file not found. See EMAIL_SETUP.md for instructions.")
 
     try:
-        # Determine redirect URI from the request
-        host = request.headers.get("host", "localhost:8000")
-        scheme = request.headers.get("x-forwarded-proto", "http")
-        redirect_uri = f"{scheme}://{host}/api/email/callback"
+        redirect_uri = _gmail_redirect_uri(request)
 
         flow = Flow.from_client_secrets_file(
             GMAIL_CREDENTIALS_FILE,
             scopes=GMAIL_SCOPES,
             redirect_uri=redirect_uri,
         )
-        auth_url, _ = flow.authorization_url(
+        auth_url, state = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
             prompt="consent",
+            code_challenge_method="S256",
         )
+        GMAIL_OAUTH_FLOWS[state] = flow
         return {"auth_url": auth_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create auth URL: {e}")
 
 
 @app.get("/api/email/callback")
-def email_callback(request: Request, code: str = None, error: str = None):
+def email_callback(
+    request: Request,
+    code: str = None,
+    state: str = None,
+    error: str = None,
+):
     """OAuth callback that exchanges the authorization code for tokens."""
     from fastapi.responses import HTMLResponse
 
@@ -2573,15 +2592,12 @@ def email_callback(request: Request, code: str = None, error: str = None):
         """)
 
     try:
-        host = request.headers.get("host", "localhost:8000")
-        scheme = request.headers.get("x-forwarded-proto", "http")
-        redirect_uri = f"{scheme}://{host}/api/email/callback"
-
-        flow = Flow.from_client_secrets_file(
-            GMAIL_CREDENTIALS_FILE,
-            scopes=GMAIL_SCOPES,
-            redirect_uri=redirect_uri,
-        )
+        flow = GMAIL_OAUTH_FLOWS.pop(state, None) if state else None
+        if flow is None:
+            raise ValueError(
+                "OAuth session expired or was not started by this server. "
+                "Please click Connect Gmail again."
+            )
         flow.fetch_token(code=code)
         creds = flow.credentials
 
