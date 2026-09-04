@@ -290,8 +290,10 @@ def fetch_weather(latitude, longitude, temp_unit="celsius"):
             f"https://api.open-meteo.com/v1/forecast?"
             f"latitude={latitude}&longitude={longitude}"
             f"&current=temperature_2m,weather_code"
+            f"&hourly=precipitation_probability,precipitation,weather_code,wind_gusts_10m"
             f"&daily=temperature_2m_max,temperature_2m_min"
             f"&temperature_unit={temp_param}"
+            f"&wind_speed_unit=kmh"
             f"&forecast_days=1"
             f"&timezone=auto"
         )
@@ -304,6 +306,7 @@ def fetch_weather(latitude, longitude, temp_unit="celsius"):
         data = response.json()
         current = data.get("current", {})
         daily = data.get("daily", {})
+        hourly = data.get("hourly", {})
 
         current_temp = current.get("temperature_2m")
         weather_code = current.get("weather_code", 0)
@@ -311,6 +314,44 @@ def fetch_weather(latitude, longitude, temp_unit="celsius"):
 
         high = daily.get("temperature_2m_max", [None])[0]
         low = daily.get("temperature_2m_min", [None])[0]
+
+        rain_gear_windows = []
+        rain_codes = {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99}
+        hourly_times = hourly.get("time", [])
+        hourly_probabilities = hourly.get("precipitation_probability", [])
+        hourly_precipitation = hourly.get("precipitation", [])
+        hourly_weather_codes = hourly.get("weather_code", [])
+        hourly_wind_gusts = hourly.get("wind_gusts_10m", [])
+        commute_windows = ((6, 9, "6h–9h"), (17, 20, "17h–20h"))
+        wind_gust_alert_windows = []
+        wind_gust_alert_threshold = 40
+
+        for start_hour, end_hour, label in commute_windows:
+            rain_expected_in_window = False
+            max_wind_gust = 0
+            for index, time_str in enumerate(hourly_times):
+                try:
+                    forecast_time = datetime.fromisoformat(time_str)
+                    probability = hourly_probabilities[index] if index < len(hourly_probabilities) else 0
+                    precipitation = hourly_precipitation[index] if index < len(hourly_precipitation) else 0
+                    forecast_code = hourly_weather_codes[index] if index < len(hourly_weather_codes) else 0
+                    wind_gust = hourly_wind_gusts[index] if index < len(hourly_wind_gusts) else 0
+                    rain_expected = (
+                        forecast_time.weekday() < 5
+                        and start_hour <= forecast_time.hour <= end_hour
+                        and forecast_code in rain_codes
+                        and (probability >= 30 or precipitation > 0)
+                    )
+                    if rain_expected:
+                        rain_expected_in_window = True
+                    if forecast_time.weekday() < 5 and start_hour <= forecast_time.hour <= end_hour:
+                        max_wind_gust = max(max_wind_gust, wind_gust)
+                except (ValueError, TypeError):
+                    continue
+            if rain_expected_in_window:
+                rain_gear_windows.append(label)
+            if max_wind_gust >= wind_gust_alert_threshold:
+                wind_gust_alert_windows.append((label, round(max_wind_gust)))
 
         unit_symbol = "°C" if temp_unit == "celsius" else "°F"
 
@@ -355,6 +396,10 @@ def fetch_weather(latitude, longitude, temp_unit="celsius"):
             "high": high,
             "low": low,
             "clothing_hint": clothing_hint,
+            "rain_gear_needed": bool(rain_gear_windows),
+            "rain_gear_windows": rain_gear_windows,
+            "wind_gust_alert_needed": bool(wind_gust_alert_windows),
+            "wind_gust_alert_windows": wind_gust_alert_windows,
         }
 
     except Exception as e:
@@ -696,6 +741,12 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
         else:
             bucket = "clear"
         coarse_weather = f"{rounded_temp}|{bucket}"
+        if weather.get("rain_gear_needed"):
+            coarse_weather += "|rain-gear:" + ",".join(weather.get("rain_gear_windows", []))
+        if weather.get("wind_gust_alert_needed"):
+            coarse_weather += "|wind-gust:" + ",".join(
+                f"{label}:{gust}" for label, gust in weather.get("wind_gust_alert_windows", [])
+            )
 
     hash_input = json.dumps({
         "mode": mode,
@@ -1146,6 +1197,15 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
         weather_badge = f"{emoji} {temp}{unit} {condition}"
         if high is not None and low is not None:
             weather_badge += f" (H:{high}{unit} L:{low}{unit})"
+        if weather.get("rain_gear_needed"):
+            windows = " et ".join(weather.get("rain_gear_windows", []))
+            weather_badge += f" | AFFAIRES DE PLUIE {windows}"
+        if weather.get("wind_gust_alert_needed"):
+            gusts = " et ".join(
+                f"{label} rafales {gust} km/h"
+                for label, gust in weather.get("wind_gust_alert_windows", [])
+            )
+            weather_badge += f" | ALERTE VENT VÉLO {gusts}"
 
         weather_section = (
             f"In the BOTTOM LEFT corner of the image, draw a small weather badge or "
@@ -1490,6 +1550,12 @@ def _generate_for_device(uid, device_id, db, force=False):
         weather = fetch_weather(latitude, longitude, temp_unit=temp_unit)
         if weather:
             weather_summary = f"{weather['emoji']} {weather['condition']}"
+            if weather.get("rain_gear_needed"):
+                weather_summary += "|rain-gear:" + ",".join(weather.get("rain_gear_windows", []))
+            if weather.get("wind_gust_alert_needed"):
+                weather_summary += "|wind-gust:" + ",".join(
+                    f"{label}:{gust}" for label, gust in weather.get("wind_gust_alert_windows", [])
+                )
             print(f"  Weather: {weather['temp']}{weather['unit_symbol']} {weather['condition']}")
 
     # ─── Change detection ───────────────────────────────────────
@@ -1683,6 +1749,10 @@ def _generate_for_device(uid, device_id, db, force=False):
     }
     if weather:
         status_data["last_weather"] = f"{weather['emoji']} {weather['temp']}{weather['unit_symbol']} {weather['condition']}"
+        if weather.get("rain_gear_needed"):
+            status_data["rain_gear_windows"] = weather.get("rain_gear_windows", [])
+        if weather.get("wind_gust_alert_needed"):
+            status_data["wind_gust_alert_windows"] = weather.get("wind_gust_alert_windows", [])
 
     device_ref.collection("status").document("status").set(status_data)
 
