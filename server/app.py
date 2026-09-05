@@ -175,9 +175,11 @@ Remember: 800×480 pixels, wide landscape, generous margins on all sides.
 {{REGION_GUIDANCE}}"""
 
 
-FASHION_PROMPT_TEMPLATE = """Create a stylish fashion-illustration daily planner in high-end editorial sketch style. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+FASHION_PROMPT_TEMPLATE = """Write all texts in french
 
-CRITICAL FRAMING: Leave generous margins — at least 40 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
+Create a stylish fashion-illustration daily planner in high-end editorial sketch style. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+
+CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
 LAYOUT — FULL-WIDTH SCENE WITH OVERLAID TEXT:
 
@@ -1962,9 +1964,11 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             
         dynamic_layout_desc = "\n\n".join(layout_desc_parts)
         
-        prompt = f"""Create a daily planner in {aes_info['intro']} style on a clean WHITE background. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+        prompt = f"""Write all texts in french
 
-CRITICAL FRAMING: Leave generous margins — at least 40 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
+Create a daily planner in {aes_info['intro']} style on a clean WHITE background. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+
+CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
 {dynamic_layout_desc}
 
