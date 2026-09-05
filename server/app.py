@@ -143,9 +143,7 @@ WMO_WEATHER_CODES = {
     99: ("Heavy thunderstorm with hail", "⛈️"),
 }
 
-DEFAULT_PROMPT_TEMPLATE = """Write all texts in french
-
-Create a children's illustrated daily planner in pen-and-ink style on a clean white paper background with crosshatching. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+DEFAULT_PROMPT_TEMPLATE = """Create a children's illustrated daily planner in pen-and-ink style on a clean white paper background with crosshatching. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
 
 CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
@@ -176,9 +174,7 @@ Remember: 800×480 pixels, wide landscape, generous margins on all sides.
 {{REGION_GUIDANCE}}"""
 
 
-FASHION_PROMPT_TEMPLATE = """Write all texts in french
-
-Create a stylish fashion-illustration daily planner in high-end editorial sketch style. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+FASHION_PROMPT_TEMPLATE = """Create a stylish fashion-illustration daily planner in high-end editorial sketch style. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
 
 CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
@@ -200,10 +196,12 @@ BOTTOM LEFT CORNER — WEATHER:
 
 {{COUNTDOWN}}
 
-STYLE RULES: Fashion illustration / editorial sketch style. Confident loose ink lines, watercolor washes, muted sophisticated color palette.
-Use ONLY these colors: black ink on pure white paper, plus limited accents of muted red, sage green, dusty blue, and ochre yellow. The background MUST be plain white (#FFFFFF) — no cream, beige, or off-white tones.
-Sophisticated, modern, editorial. Loose and artistic, not tight or cartoonish.
-The text on the left must be CLEARLY READABLE — elegant but legible.
+STYLE RULES: Fashion illustration / editorial sketch style with confident, expressive ink lines and refined watercolor washes.
+Use a clean white paper background with a sophisticated, restrained palette: black ink, white paper, plus limited accents of muted red, sage green, dusty blue, and ochre yellow.
+Use elegant silhouettes, natural poses, carefully observed clothing, and tasteful hand-drawn details inspired by a high-end magazine illustration.
+Keep the composition airy, polished, and modern, with subtle paper texture and light crosshatching where it adds depth without making the image feel busy.
+The mood should be warm, optimistic, creative, and stylish. Avoid childish cartoon styling, heavy outlines, photorealism, dark or gloomy scenes, and excessive decoration.
+The text must be CLEARLY READABLE and integrated elegantly into the illustration with high contrast.
 Remember: 800×480 pixels, wide landscape, generous margins on all sides.
 
 {{REGION_GUIDANCE}}"""
@@ -1391,6 +1389,8 @@ AESTHETIC_STYLES = {
     },
 }
 
+RANDOM_AESTHETICS = ("whimsical", "fashion", "watercolor", "pixel", "comic", "japanese")
+
 
 def _get_aesthetic_style(aesthetic):
     """Return style overrides for a given aesthetic, or None if it's the default."""
@@ -1408,6 +1408,13 @@ def _get_aesthetic_style(aesthetic):
             ),
         }
     return None
+
+
+def _resolve_aesthetic(aesthetic):
+    """Resolve the random mode to one built-in aesthetic for this generation."""
+    if aesthetic == "random":
+        return random.choice(RANDOM_AESTHETICS)
+    return aesthetic
 
 
 def _apply_aesthetic_to_template(template, aesthetic, style_overrides):
@@ -2012,9 +2019,7 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             
         dynamic_layout_desc = "\n\n".join(layout_desc_parts)
         
-        prompt = f"""Write all texts in french
-
-Create a daily planner in {aes_info['intro']} style on a clean WHITE background. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+        prompt = f"""Create a daily planner in {aes_info['intro']} style on a clean WHITE background. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
 
 CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
@@ -2042,6 +2047,9 @@ Remember: 800×480 pixels, wide landscape, generous margins on all sides, white 
         prompt = prompt.replace("{{WEATHER}}", weather_section)
         prompt = prompt.replace("{{COUNTDOWN}}", countdown_text)
         prompt = prompt.replace("{{REGION_GUIDANCE}}", region_guidance)
+
+    # This instruction is invariant across custom, aesthetic, and layout prompts.
+    prompt = "Write all texts in french\n\n" + prompt
 
     return prompt
 
@@ -2237,7 +2245,11 @@ def _generate_for_device(config: dict, force: bool = False):
     text_model = config.get("text_model", DEFAULT_TEXT_MODEL)
     characters_enabled = config.get("characters_enabled", True)
     calendar_id = config.get("calendar_id", "primary")
-    aesthetic = config.get("aesthetic", "whimsical")
+    configured_aesthetic = config.get("aesthetic", "whimsical")
+    aesthetic = _resolve_aesthetic(configured_aesthetic)
+    if configured_aesthetic == "random":
+        # Random mode must produce a new image even when all other inputs are unchanged.
+        force = True
 
     # ─── API Key Verification ───────────────────────────────────
     if not api_key:
@@ -2550,6 +2562,13 @@ def update_config(config: dict):
     save_config(existing)
     return {"status": "success"}
 
+@app.get("/api/default-prompt")
+def get_default_prompt(aesthetic: str = "whimsical"):
+    """Return the built-in prompt template used by the web editor."""
+    aesthetic = _resolve_aesthetic(aesthetic)
+    template = FASHION_PROMPT_TEMPLATE if aesthetic == "fashion" else DEFAULT_PROMPT_TEMPLATE
+    return {"aesthetic": aesthetic, "template": template}
+
 # ─── Email OAuth Endpoints ──────────────────────────────────────
 
 def _gmail_redirect_uri(request: Request):
@@ -2763,6 +2782,7 @@ def preview_prompt():
     latitude = config.get("latitude")
     longitude = config.get("longitude")
     temp_unit = config.get("temp_unit", "celsius")
+    aesthetic = _resolve_aesthetic(config.get("aesthetic", "whimsical"))
 
     characters_enabled = config.get("characters_enabled", True)
 
@@ -2826,6 +2846,7 @@ def preview_prompt():
         characters_enabled=characters_enabled,
         weather=weather,
         birthdays=[],
+        aesthetic=aesthetic,
         layout_placements=layout_placements,
         widget_configs=widget_configs,
         widget_data=widget_data,

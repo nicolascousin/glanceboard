@@ -1470,72 +1470,14 @@ $("#add-extra-btn").addEventListener("click", () => {
 
 // ─── Prompt ────────────────────────────────────────────────────
 
-const DEFAULT_PROMPT_TEMPLATES = {
-  whimsical: `Write all texts in french
-
-Create a children's illustrated daily planner in pen-and-ink style on warm parchment/cream paper background with crosshatching. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
-
-CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
-
-LAYOUT — FULL-WIDTH SCENE WITH OVERLAID TEXT:
-
-The ENTIRE image is a single charming pen-and-ink illustration of a {{SEASON}} scene related to the day's activities. The scene fills the whole canvas.
-
-TOP: A ribbon banner reads: '{{BANNER_TEXT}}' in bold hand-drawn block letters. Keep it well below the top edge.
-
-LEFT SIDE (roughly 40% width) — TEXT OVERLAY:
-Overlaid on top of the left portion of the scene, write a clear readable handwritten-style list of the day's schedule. The text sits in the FOREGROUND on top of the illustration, but the scene continues behind and around it — you might see trees, sky, a wall, or background details peeking around the edges. Keep the area behind the text relatively uncluttered so it stays legible.
-Each event on its own line with a bullet, time, and name.
-Events to show:
-{{EVENT_LIST}}
-
-RIGHT SIDE (roughly 60% width) — MAIN SCENE:
-This is where the main action and characters are. The illustration flows naturally from the left side but the main focal point (characters, action) is on the right so it doesn't compete with the text.
-{{CHARACTERS}}
-
-BOTTOM LEFT CORNER — WEATHER:
-{{WEATHER}}
-
-BOTTOM RIGHT CORNER — COUNTDOWN:
-{{COUNTDOWN}}
-
-STYLE RULES: Pen-and-ink illustration, warm parchment background, hand-drawn crosshatching, charming and whimsical.
-Use ONLY these colors: black ink, cream/white paper, plus limited accents of red, green, blue, and yellow.
-Kid-friendly, warm, joyful. No scary elements.
-The text on the left must be CLEARLY READABLE — high contrast against the background.
-Remember: 800×480 pixels, wide landscape, generous margins on all sides.`,
-  fashion: `Write all texts in french
-
-Create a stylish fashion-illustration daily planner in high-end editorial sketch style. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
-
-CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges.
-
-LAYOUT — FULL-WIDTH SCENE WITH OVERLAID TEXT:
-
-The ENTIRE image is a single elegant fashion illustration depicting a {{SEASON}} scene related to the day's activities. Think high-fashion editorial meets daily planner.
-
-TOP: An elegant hand-lettered header reads: '{{BANNER_TEXT}}' in stylish calligraphic or modern serif letters. Keep it well below the top edge.
-
-LEFT SIDE (roughly 40% width) — TEXT OVERLAY:
-Events to show:
-{{EVENT_LIST}}
-
-RIGHT SIDE (roughly 60% width) — MAIN SCENE:
-{{CHARACTERS}}
-
-BOTTOM LEFT CORNER — WEATHER:
-{{WEATHER}}
-
-BOTTOM RIGHT CORNER — COUNTDOWN:
-{{COUNTDOWN}}
-
-STYLE RULES: Fashion illustration / editorial sketch style. Confident loose ink lines, watercolor washes.
-Remember: 800×480 pixels, wide landscape, generous margins on all sides.`,
-};
-
-function getDefaultPrompt() {
+async function getDefaultPrompt() {
   const aesthetic = document.querySelector('input[name="aesthetic"]:checked')?.value || "whimsical";
-  return DEFAULT_PROMPT_TEMPLATES[aesthetic] || DEFAULT_PROMPT_TEMPLATES.whimsical;
+  const response = await fetch(`/api/default-prompt?aesthetic=${encodeURIComponent(aesthetic)}`);
+  if (!response.ok) {
+    throw new Error("Failed to load the default prompt");
+  }
+  const data = await response.json();
+  return data.template || "";
 }
 
 async function loadPromptTemplate() {
@@ -1548,7 +1490,7 @@ async function loadPromptTemplate() {
     $("#prompt-template").value = promptDoc.data().template;
   } else {
     // Show the default so users can see and edit it
-    $("#prompt-template").value = getDefaultPrompt();
+    $("#prompt-template").value = await getDefaultPrompt();
   }
 }
 
@@ -1561,7 +1503,7 @@ $("#save-prompt-btn").addEventListener("click", async () => {
 $("#reset-prompt-btn").addEventListener("click", async () => {
   if (confirm("Reset to the default prompt template?")) {
     await setDoc(doc(db, devicePath("prompt/prompt")), { template: "" });
-    $("#prompt-template").value = getDefaultPrompt();
+    $("#prompt-template").value = await getDefaultPrompt();
     toast("Prompt reset to default.", "info");
   }
 });
