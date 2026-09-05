@@ -11,7 +11,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUTS = [
     ROOT / "quotes" / "quotes.json",
-    ROOT / "glanceboard_ais" / "quotes.json",
     ROOT / "web" / "public" / "quotes.json",
 ]
 

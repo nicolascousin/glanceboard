@@ -1559,10 +1559,14 @@ $("#reset-prompt-btn").addEventListener("click", async () => {
   }
 });
 
+$$('[data-idle-label]').forEach((button) => {
+  button.textContent = button.dataset.idleLabel;
+});
+
 $("#preview-prompt-btn").addEventListener("click", async () => {
   const btn = $("#preview-prompt-btn");
   btn.disabled = true;
-  btn.textContent = "Loading...";
+  btn.textContent = "⏳ Building prompt...";
 
   try {
     const preview = httpsCallable(functions, "preview_prompt");
@@ -1578,7 +1582,7 @@ $("#preview-prompt-btn").addEventListener("click", async () => {
     toast("Preview failed: " + err.message, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Preview Prompt";
+    btn.textContent = btn.dataset.idleLabel;
   }
 });
 
@@ -1602,7 +1606,7 @@ $("#test-prompt-btn")?.addEventListener("click", async () => {
     toast("Prompt test failed: " + (error.message || error), "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "🧪 Test prompt";
+    btn.textContent = btn.dataset.idleLabel;
   }
 });
 

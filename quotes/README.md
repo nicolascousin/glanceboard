@@ -1,6 +1,6 @@
 # Quote catalog
 
-`fetch_quotes.py` retrieves free quotes from ZenQuotes and, when available, Quotable. It stores only the quote text and an internal theme in `quotes.json`, then copies the catalog to the standalone AIS app and the web public assets.
+`fetch_quotes.py` retrieves free quotes from ZenQuotes and, when available, Quotable. It stores only the quote text and an internal theme in `quotes.json`, then copies the catalog to the web public assets.
 
 Refresh the catalog with:
 
