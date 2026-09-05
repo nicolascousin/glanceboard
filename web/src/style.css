@@ -1636,6 +1636,7 @@ select {
 /* ─── Pi Setup Guide ────────────────────────────────────────── */
 .pi-setup-guide {
   margin-top: 20px;
+  margin-bottom: 20px;
   padding: 20px;
   background: var(--bg-input);
   border: 1px solid var(--border);
