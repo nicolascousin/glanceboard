@@ -1291,33 +1291,6 @@ function initLayout() {
   loadExistingLayout();
 }
 
-async function testLayoutPrompt() {
-  const btn = $("#test-prompt-btn");
-  const card = $("#layout-prompt-card");
-  const promptEl = $("#layout-prompt-text");
-  if (!btn || !card || !promptEl) return;
-
-  btn.disabled = true;
-  btn.textContent = "⏳ Building prompt...";
-  try {
-    if (_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
-    await saveLayoutNow();
-    const response = await fetch("/api/preview?skip_ai=true");
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "Prompt test failed");
-    promptEl.textContent = data.prompt || "No prompt was built.";
-    card.classList.remove("hidden");
-    toast("Prompt built without AI calls", "success");
-  } catch (error) {
-    toast("Prompt test failed: " + (error.message || error), "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "🧪 Test prompt";
-  }
-}
-
-$("#test-prompt-btn")?.addEventListener("click", testLayoutPrompt);
-
 // ─── Navigation ────────────────────────────────────────────────
 
 $$(".nav-link").forEach((link) => {
@@ -1606,6 +1579,30 @@ $("#preview-prompt-btn").addEventListener("click", async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = "Preview Prompt";
+  }
+});
+
+$("#test-prompt-btn")?.addEventListener("click", async () => {
+  const btn = $("#test-prompt-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Building prompt...";
+
+  try {
+    const response = await fetch("/api/preview?skip_ai=true");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Prompt test failed");
+    $("#prompt-preview")?.classList.remove("hidden");
+    let previewText = data.prompt || "(empty)";
+    if (data.weather) {
+      previewText += `\n\n--- Weather Data ---\n${data.weather.emoji} ${data.weather.temp}${data.weather.unit_symbol} ${data.weather.condition}`;
+    }
+    $("#prompt-preview-text").textContent = previewText;
+    toast("Prompt built without AI calls", "success");
+  } catch (error) {
+    toast("Prompt test failed: " + (error.message || error), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🧪 Test prompt";
   }
 });
 
