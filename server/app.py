@@ -40,6 +40,7 @@ import secrets
 import time
 import unicodedata
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -110,6 +111,24 @@ BACKUP_QUOTES = [
     "Kindness is a superpower — use it!",
     "Dream big, start small, act now!",
 ]
+
+QUOTE_FILE = Path(__file__).resolve().parent.parent / "quotes" / "quotes.json"
+
+
+def load_quote_catalog():
+    try:
+        with QUOTE_FILE.open(encoding="utf-8") as quote_file:
+            quotes = json.load(quote_file)
+        return [item["text"] for item in quotes if item.get("text")]
+    except (OSError, json.JSONDecodeError, TypeError, KeyError):
+        return BACKUP_QUOTES
+
+
+QUOTE_CATALOG = load_quote_catalog()
+
+
+def get_random_quote():
+    return random.choice(QUOTE_CATALOG)
 
 # Weather condition code mapping (WMO codes from Open-Meteo)
 WMO_WEATHER_CODES = {
@@ -1955,10 +1974,10 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
                         f"'{weather_badge}'"
                     )
             elif widget_key == "quote":
-                quote_text = random.choice(BACKUP_QUOTES)
+                quote_text = get_random_quote()
                 layout_desc_parts.append(
-                    f"- DAILY QUOTE (placed {pos_desc}): Draw this quote in a charming speech bubble or quote card: "
-                    f"\"{quote_text}\""
+                    f"- DAILY QUOTE (placed {pos_desc}): Draw only this exact quote in a charming speech bubble or quote card. "
+                    f"Do not draw an author, source, title, label, or any other text: \"{quote_text}\""
                 )
             elif widget_key == "stocks":
                 stocks_info = widget_data.get("stocks", {}) if widget_data else {}

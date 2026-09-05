@@ -641,6 +641,13 @@ const BACKUP_QUOTES = [
   "Try something you've never done before!","Be a good friend today!",
   "The world is better because you're in it!","Every day is a chance to be awesome!",
 ];
+let quoteCatalog = [];
+
+function getRandomQuote() {
+  const availableQuotes = quoteCatalog.length ? quoteCatalog : BACKUP_QUOTES;
+  const quote = availableQuotes[Math.floor(Math.random() * availableQuotes.length)];
+  return typeof quote === 'string' ? quote : quote.text;
+}
 
 const WIDGETS = {
   calendar:{icon:'📅',name:'Calendar',preview:'9am Meeting\n12pm Lunch'},
@@ -1183,7 +1190,7 @@ function buildPrompt(events, characters, promptTemplate, opts = {}) {
       }
     }
   } else {
-    eventItems.push(`• ${BACKUP_QUOTES[Math.floor(Math.random() * BACKUP_QUOTES.length)]}`);
+    eventItems.push(`• ${getRandomQuote()}`);
   }
   const eventListStr = eventItems.join('\n');
   const eventCount = eventItems.length;
@@ -1234,7 +1241,7 @@ function buildPrompt(events, characters, promptTemplate, opts = {}) {
     for (const [key, p] of Object.entries(layoutPlacements)) {
       if (key === 'calendar' && eventListStr.trim()) parts.push(`- CALENDAR (col ${p.col}, row ${p.row}):\n${eventListStr}`);
       else if (key === 'weather' && weatherSection) parts.push(`- WEATHER (col ${p.col}, row ${p.row}): ${weatherSection}`);
-      else if (key === 'quote') parts.push(`- QUOTE (col ${p.col}, row ${p.row}): "${BACKUP_QUOTES[Math.floor(Math.random() * BACKUP_QUOTES.length)]}"`);
+      else if (key === 'quote') parts.push(`- QUOTE (col ${p.col}, row ${p.row}): Draw only this exact quote, with no author, source, label, or other text: "${getRandomQuote()}"`);
       else if (key === 'countdown' && countdownText) parts.push(`- COUNTDOWN (col ${p.col}, row ${p.row}):\n${cdItems.join('\n')}`);
     }
     if (charSection) parts.push(`- CHARACTERS: ${charSection}`);
@@ -1691,6 +1698,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.location.search.includes('display')) return;
 
   loadConfig();
+
+  fetch('quotes.json')
+    .then(response => response.ok ? response.json() : [])
+    .then(quotes => { quoteCatalog = Array.isArray(quotes) ? quotes : []; })
+    .catch(() => {});
 
   // Check if configured
   if (!config.ical_url && !config.api_key && !config.openrouter_api_key) {
