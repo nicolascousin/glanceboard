@@ -65,21 +65,19 @@
     <h2>How We Use Your Data</h2>
     <ul>
       <li><strong>Image generation</strong> — Calendar events and weather are sent to an AI image generation API (Google Gemini or OpenRouter, depending on your configuration) to create illustrated daily planners.</li>
-      <li><strong>Display delivery</strong> — Generated images are stored in Firebase Storage so your e-ink display can fetch them.</li>
+      <li><strong>Display delivery</strong> — Generated images are stored on your self-hosted server so your e-ink display can fetch them.</li>
       <li><strong>No selling or sharing</strong> — We do not sell, rent, or share your personal data with third parties for marketing or advertising purposes.</li>
     </ul>
 
     <h2>Data Storage</h2>
     <ul>
-      <li>Account settings and calendar tokens are stored in Google Cloud Firestore.</li>
-      <li>Generated images are stored in Firebase Storage.</li>
-      <li>Character reference photos are stored in Firebase Storage, accessible only to your account.</li>
-      <li>All data is hosted on Google Cloud infrastructure in the Australia (Sydney) region.</li>
+      <li>Account settings and calendar tokens are stored in the local server data directory.</li>
+      <li>Generated images and character reference photos are stored on your self-hosted server.</li>
+      <li>You are responsible for securing and backing up the server.</li>
     </ul>
 
     <h2>Third-Party Services</h2>
     <ul>
-      <li><strong>Google Cloud / Firebase</strong> — Hosting, authentication, database, and file storage.</li>
       <li><strong>Google Gemini / OpenRouter</strong> — AI image generation. Calendar event titles and weather data are sent to generate images. No personal identifiers are included in these requests.</li>
       <li><strong>Open-Meteo</strong> — Weather data based on your provided location coordinates.</li>
     </ul>
@@ -104,7 +102,7 @@
     </ul>
 
     <h2>Security</h2>
-    <p>We use Firebase Authentication for secure sign-in, Firestore security rules to restrict data access to account owners, and HTTPS for all data in transit. Generated display images are publicly readable by URL (so your e-ink display can fetch them without authentication), but the URLs are unguessable and not indexed.</p>
+    <p>The local server stores configuration and generated images on disk. Use HTTPS and network access controls when exposing it beyond your private network.</p>
 
     <h2>Contact</h2>
     <p>If you have questions about this policy, contact us at <a href="mailto:hello@glanceboard.com">hello@glanceboard.com</a>.</p>

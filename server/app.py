@@ -13,13 +13,7 @@
 # limitations under the License.
 
 """
-Glanceboard — Firebase Cloud Functions (Multi-User, Multi-Device).
-
-Serverless image generation pipeline with subscription tiers:
-  - Free (self-hosted): User runs their own Firebase project
-  - Hosted ($3/mo): User provides their own API key, we host the app
-  - Plus ($9/mo): Fully managed, server-side API key
-  - Additional devices: $10/mo per extra display (paid tiers only)
+Glanceboard — local FastAPI server for a single display.
 
 Display hardware: Waveshare ESP32-S3 PhotoPainter (all-in-one e-ink frame).
 Legacy Raspberry Pi + separate display is still supported but no longer primary.
@@ -27,30 +21,13 @@ Legacy Raspberry Pi + separate display is still supported but no longer primary.
 Pipeline (per device):
   1. Fetch calendar events via Google Calendar API (OAuth refresh token)
   2. Fetch weather via Open-Meteo API
-  3. Load character config from user's Firestore subcollection
+    3. Load character configuration from the local JSON config
   4. Build an adventure prompt (with weather context)
   5. Generate image via appropriate API key (user's or server's)
   6. Resize & dither for the 6-color e-ink display
-  7. Save to device's Firebase Storage path (publicly accessible for the Pi)
+    7. Save generated images under the local data directory
 
-Data model:
-  User-level (shared across devices):
-    Firestore: users/{uid}/settings/account  (API key, timezone, location)
-    Firestore: users/{uid}/settings/subscription
-    Firestore: users/{uid}/settings/google_tokens
-    Firestore: users/{uid}/characters/{id}
-
-  Device-level (per display):
-    Firestore: users/{uid}/devices/{deviceId}  (name, aesthetic, model, calendar)
-    Firestore: users/{uid}/devices/{deviceId}/prompt/prompt
-    Firestore: users/{uid}/devices/{deviceId}/status/status
-    Storage:   users/{uid}/devices/{deviceId}/display/*
-    Storage:   users/{uid}/devices/{deviceId}/archive/*
-
-  Legacy (pre-migration, still supported with fallback reads):
-    Firestore: users/{uid}/settings/config
-    Firestore: users/{uid}/settings/prompt
-    Storage:   users/{uid}/display/*
+Configuration and generated images are stored under server/data/.
 """
 import base64
 import hashlib
@@ -1106,7 +1083,8 @@ def _determine_mode_and_events(hour, today_events, tomorrow_events, timezone):
             return "today", banner, []
 
 
-def _compute_generation_hash(mode, banner_text, events, weather_summary="", weather=None):
+def _compute_generation_hash(mode, banner_text, events, weather_summary="", weather=None,
+                             characters=None):
     """Compute a hash of the generation inputs to detect changes.
 
     Only regenerate when this hash differs from the last generation.
@@ -1117,6 +1095,14 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
     for ev in (events or []):
         event_keys.append(f"{ev.get('start', '')}|{ev.get('summary', '')}")
     event_keys.sort()
+
+    character_keys = []
+    for character in (characters or []):
+        character_keys.append({
+            key: character.get(key, "")
+            for key in ("id", "type", "name", "gender", "age", "birthday", "description", "imageUrl")
+        })
+    character_keys.sort(key=lambda character: character.get("id", ""))
 
     # Coarsen weather so minor changes (17°C → 18°C, "clear" → "few clouds") don't trigger regen
     coarse_weather = ""
@@ -1149,6 +1135,7 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
         "mode": mode,
         "banner": banner_text,
         "events": event_keys,
+        "characters": character_keys,
         "weather": coarse_weather,
     }, sort_keys=True)
 
@@ -2246,8 +2233,17 @@ def _generate_for_device(config: dict, force: bool = False):
                 )
             print(f"  Weather: {weather['temp']}{weather['unit_symbol']} {weather['condition']}")
 
+    # ─── Load characters ────────────────────────────────────────
+    characters = config.get("characters", [])
+    selected_chars = config.get("selected_characters", [])
+    if selected_chars and len(selected_chars) > 0:
+        characters = [c for c in characters if c.get("id") in selected_chars]
+
     # ─── Change detection ───────────────────────────────────────
-    generation_hash = _compute_generation_hash(mode, banner_text, events, weather_summary, weather=weather)
+    generation_hash = _compute_generation_hash(
+        mode, banner_text, events, weather_summary, weather=weather,
+        characters=characters,
+    )
 
     if not force:
         status_dict = config.get("status", {})
@@ -2256,14 +2252,6 @@ def _generate_for_device(config: dict, force: bool = False):
             return {"skipped": True, "hash": generation_hash}
 
     print(f"  🎨 Changes detected (hash={generation_hash}), generating new image...")
-
-    # ─── Load characters ────────────────────────────────────────
-    characters = config.get("characters", [])
-    
-    # Filter characters by device selection
-    selected_chars = config.get("selected_characters", [])
-    if selected_chars and len(selected_chars) > 0:
-        characters = [c for c in characters if c.get("id") in selected_chars]
 
     prompt_template = config.get("prompt_template", "")
 

@@ -240,22 +240,14 @@ glanceboard/
 │   └── src/
 │       ├── main.js             # App logic
 │       ├── style.css           # Styles
-│       ├── config.js           # Firebase config (gitignored, only for hosted version)
-│       └── config.example.js   # Template config
-├── functions/                  # Cloud Functions (for hosted version)
-│   ├── main.py                 # Backend logic (Firebase variant)
-│   └── requirements.txt        # Python dependencies
+│       └── config.example.js   # Local frontend defaults
 ├── firmware/                   # ESP32-S3 PhotoPainter docs
 │   └── README.md               # SD card & firmware setup
 ├── pi/                         # Legacy Raspberry Pi scripts
 │   ├── LEGACY_PI_SETUP.md      # Pi setup guide
 │   ├── install.sh              # One-line installer
 │   └── display_update.py       # Display update script
-├── firestore.rules             # Firestore security rules (hosted version)
-├── storage.rules               # Storage security rules (hosted version)
-├── firebase.json               # Firebase config (hosted version)
 ├── SELF_HOSTING.md             # Guide to running on your own server 24/7
-├── FIREBASE_DEPLOY.md          # Firebase deployment guide (hosted version)
 ├── EMAIL_SETUP.md              # Optional email widget setup guide
 └── LICENSE                     # Apache 2.0 License
 ```

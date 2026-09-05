@@ -16,7 +16,7 @@ limitations under the License.
 
 # Self-Hosting Guide
 
-Run Glanceboard on your own server — a Raspberry Pi, old laptop, or any always-on machine on your home network. No cloud, no subscription, no Firebase.
+Run Glanceboard on your own server — a Raspberry Pi, old laptop, or any always-on machine on your home network. No external account or subscription is required.
 
 ---
 
@@ -141,7 +141,7 @@ Your e-ink display needs to fetch images from your server over your local networ
    - Set **Interval** → `300` (5 minutes)
    - Enable **Auto Rotate**
 
-> **Using a Pi as the display too?** See [Legacy Pi Setup](pi/LEGACY_PI_SETUP.md) — just use your local server URL instead of a Firebase URL.
+> **Using a Pi as the display too?** See [Legacy Pi Setup](pi/LEGACY_PI_SETUP.md) and use your local server URL.
 
 ---
 

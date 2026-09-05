@@ -3,12 +3,7 @@
 .env.*
 functions/.env
 
-# ─── Firebase ───────────────────────────────────────────
-.firebase/
-.firebaserc
-
 # ─── App Config (contains API keys) ────────────────────
-# Self-hosters: copy config.example.js → config.js
 web/src/config.js
 server/data/config.json
 server/data/gmail_credentials.json
@@ -25,7 +20,6 @@ output/
 node_modules/
 web/node_modules/
 venv/
-functions/venv/
 email-worker/node_modules/
 
 # ─── Python ────────────────────────────────────────────

@@ -17,8 +17,8 @@
 /**
  * Glanceboard — Frontend JavaScript
  *
- * Multi-user dashboard with Google Sign-In, Calendar API integration,
- * weather settings, and per-user Firestore scoping.
+ * Local dashboard with calendar integration, weather settings, and
+ * a FastAPI backend for configuration and image generation.
  */
 
 // ─── Local API Shims ───────────────────────────────────────────
@@ -37,7 +37,6 @@ function signInAnonymously() { return Promise.resolve(); }
 function onAuthStateChanged(a, cb) { cb(auth.currentUser); }
 function signOut() { return Promise.resolve(); }
 
-function getFirestore() { return db; }
 function doc(db, path) { return { path }; }
 function collection(db, path) { return { path }; }
 
@@ -1590,12 +1589,12 @@ $("#preview-prompt-btn").addEventListener("click", async () => {
 // ─── Settings ──────────────────────────────────────────────────
 
 /**
- * Load dynamic model list from Firestore (system/available_models).
+ * Load dynamic model list from the local API when available.
  * Falls back to the hardcoded <option> elements if unavailable.
  */
 async function loadDynamicModels() {
   // Self-hosted: use the hardcoded options in the HTML select.
-  // Don't try to fetch from Firebase system/available_models.
+  // The local server may provide the model list; keep the built-in list otherwise.
   return;
 }
 

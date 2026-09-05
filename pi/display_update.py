@@ -16,7 +16,7 @@
 """
 E-Ink Display Updater — runs on the Raspberry Pi Zero 2W.
 
-Fetches the latest calendar art from Firebase Storage and renders it
+Fetches the latest calendar art from the local Glanceboard server and renders it
 on the Waveshare 7.3" E6 Full Color E-Paper display (PhotoPainter ACCE).
 
 Modes:

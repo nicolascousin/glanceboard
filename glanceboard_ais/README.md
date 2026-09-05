@@ -71,7 +71,7 @@ Everything runs client-side:
 
 ## Differences from Glanceboard
 - No Python server needed
-- No Firebase/Firestore
+- No external backend
 - No background scheduler (uses browser setInterval)
 - Email widget not supported (requires server-side OAuth)
 - Character images stored as base64 in localStorage

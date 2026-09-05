@@ -98,8 +98,8 @@ journalctl -u eink-display -f
 ## How It Works
 
 The Pi runs a Python script (`display_update.py`) that:
-1. Polls the image URL every 5 minutes (either your local Glanceboard server or Firebase Storage)
+1. Polls the image URL every 5 minutes from your local Glanceboard server
 2. Downloads the latest image when it changes (hash-based detection)
 3. Pushes the image to the e-ink display via SPI
 
-The Pi is just a display client — it fetches images from wherever your Glanceboard server is running (local server or Firebase). See the main [Self-Hosting Guide](../SELF_HOSTING.md) for setting up the server.
+The Pi is just a display client — it fetches images from your local Glanceboard server. See the main [Self-Hosting Guide](../SELF_HOSTING.md) for setting up the server.
