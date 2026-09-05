@@ -286,6 +286,38 @@ def _fetch_events_ical(ical_url, range_start, range_end, timezone):
         return []
 
 
+def _get_calendar_sources(config):
+    """Return configured iCal sources, with legacy ical_url support."""
+    calendars = config.get("calendars") or []
+    sources = []
+    for index, calendar in enumerate(calendars):
+        if isinstance(calendar, str):
+            url = calendar.strip()
+            name = f"Calendar {index + 1}"
+        else:
+            url = str(calendar.get("ical_url", "")).strip()
+            name = str(calendar.get("name", "")).strip() or f"Calendar {index + 1}"
+        if url:
+            sources.append({"id": f"calendar-{index + 1}", "name": name, "url": url})
+
+    if not sources and config.get("ical_url"):
+        sources.append({"id": "calendar-1", "name": "Calendar", "url": config["ical_url"].strip()})
+    return sources
+
+
+def fetch_events_for_config(config, timezone, target_date):
+    """Fetch and merge events from every configured iCal source."""
+    events = []
+    for source in _get_calendar_sources(config):
+        source_events = fetch_events_ical(source["url"], timezone=timezone, target_date=target_date)
+        for event in source_events:
+            event["calendar_id"] = source["id"]
+            event["calendar_name"] = source["name"]
+        events.extend(source_events)
+    events.sort(key=lambda event: (event.get("start_iso") is None, event.get("start_iso") or ""))
+    return events
+
+
 def fetch_events_ical(ical_url, timezone=DEFAULT_TIMEZONE, target_date=None):
     """Fetch events from iCal feed for a specific date."""
     tz = ZoneInfo(timezone)
@@ -1113,7 +1145,7 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
     """
     event_keys = []
     for ev in (events or []):
-        event_keys.append(f"{ev.get('start', '')}|{ev.get('summary', '')}")
+        event_keys.append(f"{ev.get('calendar_id', '')}|{ev.get('start', '')}|{ev.get('summary', '')}")
     event_keys.sort()
 
     character_keys = []
@@ -2254,7 +2286,6 @@ def _generate_for_device(config: dict, force: bool = False):
     
     api_key = config.get("openrouter_api_key", "") or config.get("api_key", "")
     api_provider = config.get("api_provider", "google")
-    ical_url = config.get("ical_url", "")
     timezone = config.get("timezone", DEFAULT_TIMEZONE)
     latitude = config.get("latitude")
     longitude = config.get("longitude")
@@ -2288,10 +2319,11 @@ def _generate_for_device(config: dict, force: bool = False):
     tomorrow_events = []
     birthdays = []
     
-    if ical_url:
-        today_events = fetch_events_ical(ical_url, timezone=timezone, target_date=today)
-        tomorrow_events = fetch_events_ical(ical_url, timezone=timezone, target_date=tomorrow)
-        print(f"  📅 iCal: {len(today_events)} today, {len(tomorrow_events)} tomorrow")
+    calendar_sources = _get_calendar_sources(config)
+    if calendar_sources:
+        today_events = fetch_events_for_config(config, timezone, today)
+        tomorrow_events = fetch_events_for_config(config, timezone, tomorrow)
+        print(f"  📅 iCal: {len(calendar_sources)} calendars, {len(today_events)} today, {len(tomorrow_events)} tomorrow")
     else:
         print("  ⚠️ No iCal URL provided")
 
@@ -2791,12 +2823,11 @@ def check_display_update():
     }
 
 @app.get("/api/preview")
-def preview_prompt():
+def preview_prompt(skip_ai: bool = False):
     config = load_config()
     if not config:
         raise HTTPException(status_code=400, detail="Not configured")
 
-    ical_url = config.get("ical_url", "")
     timezone = config.get("timezone", DEFAULT_TIMEZONE)
     latitude = config.get("latitude")
     longitude = config.get("longitude")
@@ -2812,9 +2843,9 @@ def preview_prompt():
 
     today_events = []
     tomorrow_events = []
-    if ical_url:
-        today_events = fetch_events_ical(ical_url, timezone=timezone, target_date=today)
-        tomorrow_events = fetch_events_ical(ical_url, timezone=timezone, target_date=tomorrow)
+    if _get_calendar_sources(config):
+        today_events = fetch_events_for_config(config, timezone, today)
+        tomorrow_events = fetch_events_for_config(config, timezone, tomorrow)
 
     mode, banner_text, events = _determine_mode_and_events(
         hour, today_events, tomorrow_events, timezone
@@ -2839,21 +2870,22 @@ def preview_prompt():
     api_provider = config.get("api_provider", "google")
     
     needs_widget_data = any(w in layout_placements for w in ["stocks", "sports", "news", "history"])
-    if needs_widget_data and api_key:
+    if needs_widget_data and (api_key or skip_ai):
         stocks_symbols = widget_configs.get("stocks", {}).get("symbols") or (
             [widget_configs.get("stocks", {}).get("symbol")] if widget_configs.get("stocks", {}).get("symbol") else []
         )
         sports_team = widget_configs.get("sports", {}).get("team")
         widget_data = fetch_widget_data_via_gemini(
-            api_key, api_provider=api_provider, text_model=text_model,
+            "" if skip_ai else api_key,
+            api_provider=api_provider, text_model=text_model,
             stocks_symbols=stocks_symbols, sports_team=sports_team
         )
 
     # ─── Fetch email widget data (optional) ──────────────────────
-    if "email" in layout_placements and api_key:
+    if "email" in layout_placements and (api_key or skip_ai):
         max_emails = widget_configs.get("email", {}).get("max_emails", 5)
         email_data = fetch_email_widget_data(
-            api_key, api_provider=api_provider, text_model=text_model,
+            "" if skip_ai else api_key, api_provider=api_provider, text_model=text_model,
             max_emails=max_emails
         )
         widget_data.update(email_data)

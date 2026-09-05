@@ -1019,6 +1019,25 @@ select {
   margin-top: 6px;
 }
 
+.calendar-source-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(220px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+  .calendar-source-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .calendar-source-row .calendar-url {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
 .readonly-input {
   opacity: 0.6;
   cursor: default;

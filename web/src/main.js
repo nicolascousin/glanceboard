@@ -326,8 +326,54 @@ document.querySelectorAll('input[name="aesthetic"]').forEach(radio => {
 });
 
 // ─── Calendar (iCal URL — self-hosted) ─────────────────────────
-// Calendar is configured via iCal URL in settings/onboarding.
-// No OAuth needed for self-hosted.
+function configuredCalendars(config = {}) {
+  if (Array.isArray(config.calendars) && config.calendars.length > 0) {
+    return config.calendars;
+  }
+  return config.ical_url ? [{ name: "Calendar", ical_url: config.ical_url }] : [{ name: "", ical_url: "" }];
+}
+
+function hasConfiguredCalendar(config = {}) {
+  return !!config.ical_url || (Array.isArray(config.calendars) && config.calendars.some(calendar => calendar?.ical_url));
+}
+
+function renderCalendarInputs(containerId, calendars) {
+  const container = $(containerId);
+  if (!container) return;
+  container.innerHTML = "";
+  calendars.forEach((calendar, index) => {
+    const row = document.createElement("div");
+    row.className = "calendar-source-row";
+    row.innerHTML = `
+      <input type="text" class="calendar-name" placeholder="Name (e.g. Family)" value="${String(calendar.name || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">
+      <input type="url" class="calendar-url" placeholder="https://calendar.google.com/calendar/ical/..." value="${String(calendar.ical_url || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">
+      <button type="button" class="btn-icon-only calendar-remove" aria-label="Remove calendar">✕</button>`;
+    row.querySelector(".calendar-remove").addEventListener("click", () => {
+      row.remove();
+      if (!container.children.length) renderCalendarInputs(containerId, [{ name: "", ical_url: "" }]);
+    });
+    container.appendChild(row);
+  });
+}
+
+function readCalendarInputs(containerId) {
+  return [...document.querySelectorAll(`${containerId} .calendar-source-row`)]
+    .map(row => ({
+      name: row.querySelector(".calendar-name")?.value.trim() || "",
+      ical_url: row.querySelector(".calendar-url")?.value.trim() || "",
+    }))
+    .filter(calendar => calendar.ical_url);
+}
+
+function addCalendarInput(containerId) {
+  const calendars = readCalendarInputs(containerId);
+  calendars.push({ name: "", ical_url: "" });
+  renderCalendarInputs(containerId, calendars);
+}
+
+renderCalendarInputs("#onboard-calendars", [{ name: "", ical_url: "" }]);
+$("#onboard-add-calendar")?.addEventListener("click", () => addCalendarInput("#onboard-calendars"));
+$("#setting-add-calendar")?.addEventListener("click", () => addCalendarInput("#setting-calendars"));
 
 // ─── Geocoding (Open-Meteo) ────────────────────────────────────
 
@@ -492,8 +538,8 @@ $("#onboard-next-3")?.addEventListener("click", () => {
   // Update summary
   $("#summary-tier").textContent = "Self-Hosted ✓";
   $("#summary-api").textContent = "API key configured ✓";
-  const icalUrl = $("#onboard-ical")?.value?.trim();
-  $("#summary-cal").textContent = icalUrl
+  const calendars = readCalendarInputs("#onboard-calendars");
+  $("#summary-cal").textContent = calendars.length
     ? "iCal URL configured ✓"
     : "Calendar not configured (you can add it in Settings)";
   $("#summary-weather").textContent = onboardingData.latitude
@@ -513,7 +559,7 @@ $("#onboard-back-3")?.addEventListener("click", () => showOnboardStep(2));
 // Step 5: Finish
 $("#onboard-finish").addEventListener("click", async () => {
   const apiKey = $("#onboard-api-key")?.value?.trim() || "";
-  const icalUrl = $("#onboard-ical")?.value?.trim() || "";
+  const calendars = readCalendarInputs("#onboard-calendars");
   const timezone = $("#onboard-timezone").value;
 
   const provider = $("#onboard-api-provider")?.value || "google";
@@ -521,7 +567,8 @@ $("#onboard-finish").addEventListener("click", async () => {
   const config = {
     api_provider: provider,
     openrouter_api_key: apiKey,
-    ical_url: icalUrl,
+    calendars,
+    ical_url: calendars[0]?.ical_url || "",
     timezone: timezone,
     image_model: "google/gemini-3-pro-image",
     characters_enabled: true,
@@ -609,9 +656,9 @@ async function loadDashboard() {
       $("#stat-model").textContent = model;
 
       // Check calendar (iCal URL based for self-hosted)
-      calendarConnected = !!c.ical_url;
-      $("#stat-calendar").textContent = c.ical_url
-        ? "iCal URL"
+      calendarConnected = hasConfiguredCalendar(c);
+      $("#stat-calendar").textContent = calendarConnected
+        ? `${c.calendars?.length || 1} iCal calendar${(c.calendars?.length || 1) > 1 ? "s" : ""}`
         : "Not configured";
 
       // Display URL — fetch from backend which knows its own network IP
@@ -698,18 +745,22 @@ function buildCapabilities() {
 }
 
 let _layoutSaveTimer = null;
+async function saveLayoutNow() {
+  if (!currentUser) return;
+  const caps = buildCapabilities();
+  const saveData = {
+    layout_placements: placements,
+    widget_configs: widgetConfigs,
+    capabilities: caps,
+  };
+  await setDoc(doc(db, devicePath("")), saveData, { merge: true });
+}
+
 function layoutAutoSave() {
   if (_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
   _layoutSaveTimer = setTimeout(async () => {
-    if (!currentUser) return;
     try {
-      const caps = buildCapabilities();
-      const saveData = {
-        layout_placements: placements,
-        widget_configs: widgetConfigs,
-        capabilities: caps,
-      };
-      await setDoc(doc(db, devicePath("")), saveData, { merge: true });
+      await saveLayoutNow();
       console.log("💾 Layout auto-saved");
     } catch (e) {
       console.warn("Layout auto-save failed:", e);
@@ -800,7 +851,7 @@ function hasRequiredConfig(widgetKey) {
   switch (widgetKey) {
     case "weather": return !!(cfg.latitude || cfg.location_name);
     case "sports": return !!(cfg.team);
-    case "calendar": return calendarConnected || !!(_localConfig && _localConfig.ical_url);
+    case "calendar": return calendarConnected || hasConfiguredCalendar(_localConfig);
     case "countdown": return !!(cfg.event_name && cfg.event_date);
     case "stocks": {
       const symbols = cfg.symbols || (cfg.symbol ? [cfg.symbol] : []);
@@ -1023,7 +1074,7 @@ function openLayoutConfig(widgetKey) {
       html = `<div class="form-group"><label>Your team</label><input type="text" id="cfg-sports-team" placeholder="e.g. Arsenal, Lakers" value="${cfg.team || ""}" maxlength="60"></div>`;
       break;
     case "calendar": {
-      const icalSet = calendarConnected || !!(_localConfig && _localConfig.ical_url);
+      const icalSet = calendarConnected || hasConfiguredCalendar(_localConfig);
       html = icalSet
         ? `<p class="help-text" style="color:var(--success)">✅ Calendar connected via iCal URL</p>`
         : `<p class="help-text">⚠️ No calendar connected yet.</p>
@@ -1239,6 +1290,33 @@ function initLayout() {
   layoutRenderCanvas();
   loadExistingLayout();
 }
+
+async function testLayoutPrompt() {
+  const btn = $("#test-prompt-btn");
+  const card = $("#layout-prompt-card");
+  const promptEl = $("#layout-prompt-text");
+  if (!btn || !card || !promptEl) return;
+
+  btn.disabled = true;
+  btn.textContent = "⏳ Building prompt...";
+  try {
+    if (_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
+    await saveLayoutNow();
+    const response = await fetch("/api/preview?skip_ai=true");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Prompt test failed");
+    promptEl.textContent = data.prompt || "No prompt was built.";
+    card.classList.remove("hidden");
+    toast("Prompt built without AI calls", "success");
+  } catch (error) {
+    toast("Prompt test failed: " + (error.message || error), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🧪 Test prompt";
+  }
+}
+
+$("#test-prompt-btn")?.addEventListener("click", testLayoutPrompt);
 
 // ─── Navigation ────────────────────────────────────────────────
 
@@ -1571,7 +1649,7 @@ async function loadSettings() {
     inputEl.placeholder = "sk-or-v1-...";
   }
   $("#setting-api-key").value = apiKey;
-  $("#setting-ical-url").value = c.ical_url || "";
+  renderCalendarInputs("#setting-calendars", configuredCalendars(c));
   $("#setting-timezone").value = c.timezone || DEFAULT_TIMEZONE;
   $("#setting-location").value = c.location_name || "";
 
@@ -1610,7 +1688,7 @@ async function loadSettings() {
   }
 
   // Calendar connection status (iCal URL for self-hosted)
-  calendarConnected = !!c.ical_url;
+  calendarConnected = hasConfiguredCalendar(c);
 
   // Device URL — fetch from backend which knows its own network IP
   try {
@@ -1771,7 +1849,7 @@ async function doSaveSettings() {
   const account = {
     api_provider: $("#setting-api-provider")?.value || "google",
     openrouter_api_key: $("#setting-api-key").value.trim(),
-    ical_url: $("#setting-ical-url").value.trim(),
+    calendars: readCalendarInputs("#setting-calendars"),
     timezone: $("#setting-timezone").value,
     generation_schedule: currentSchedule,
     setup_complete: true,
@@ -1789,11 +1867,8 @@ async function doSaveSettings() {
     characters_enabled: $("#setting-characters").checked,
   };
 
-  // iCal URL (user-level, saved to config)
-  const icalUrl = $("#setting-ical-url")?.value?.trim();
-  if (icalUrl) {
-    account.ical_url = icalUrl;
-  }
+  // Keep the first URL as a legacy alias for older server versions.
+  account.ical_url = account.calendars[0]?.ical_url || "";
 
   // Weather location (user-level)
   const tempUnit =
@@ -1838,7 +1913,7 @@ $("#save-settings-btn")?.addEventListener("click", () => doSaveSettings());
   $(sel)?.addEventListener("change", settingsAutoSave);
 });
 // Text inputs — debounce on input
-["#setting-api-key", "#setting-ical-url"].forEach(sel => {
+["#setting-api-key", "#setting-calendars"].forEach(sel => {
   $(sel)?.addEventListener("input", settingsAutoSave);
 });
 // Aesthetic radio buttons

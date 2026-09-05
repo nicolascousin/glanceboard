@@ -91,9 +91,10 @@
             💡 <strong>Google Calendar:</strong> Settings → your calendar → "Secret address in iCal format"
           </p>
           <div class="form-group">
-            <label for="onboard-ical">iCal Feed URL</label>
-            <input type="url" id="onboard-ical" placeholder="https://calendar.google.com/calendar/ical/...">
-            <p class="help-text">Works with Google Calendar, Outlook, Apple Calendar, or any iCal feed.</p>
+            <label>iCal calendars</label>
+            <div id="onboard-calendars"></div>
+            <button id="onboard-add-calendar" class="btn btn-secondary" type="button">+ Add calendar</button>
+            <p class="help-text">Add one or more feeds from Google Calendar, Outlook, Apple Calendar, or any iCal source.</p>
           </div>
 
           <div class="form-group" style="margin-top: 16px;">
@@ -315,6 +316,7 @@
           <div class="page-header">
             <h2>Layout</h2>
             <p class="page-subtitle">Drag widgets onto the canvas to design your display</p>
+            <button id="test-prompt-btn" class="btn btn-secondary">🧪 Test prompt</button>
           </div>
           <div class="layout-builder">
             <div class="canvas-frame">
@@ -326,6 +328,10 @@
               <h3 class="tray-title">Widgets</h3>
               <div id="widget-tray" class="widget-tray"></div>
             </div>
+          </div>
+          <div id="layout-prompt-card" class="card hidden" style="margin-top: 20px;">
+            <h3>Prompt preview</h3>
+            <pre id="layout-prompt-text" class="prompt-preview-text"></pre>
           </div>
           <div id="layout-config-panel" class="layout-config-panel hidden">
             <div class="layout-config-panel-header">
@@ -467,9 +473,10 @@
           <div class="card" style="margin-bottom: 20px;">
             <h3>📅 Calendar</h3>
             <div class="form-group">
-              <label for="setting-ical-url">iCal Feed URL</label>
-              <input type="url" id="setting-ical-url" placeholder="https://calendar.google.com/calendar/ical/...">
-              <p class="help-text">Paste your calendar's secret iCal URL. Works with Google Calendar, Outlook, Apple Calendar, or any iCal feed.</p>
+              <label>iCal calendars</label>
+              <div id="setting-calendars"></div>
+              <button id="setting-add-calendar" class="btn btn-secondary" type="button">+ Add calendar</button>
+              <p class="help-text">Add one or more secret iCal URLs from Google Calendar, Outlook, Apple Calendar, or any iCal feed.</p>
             </div>
           </div>
 
