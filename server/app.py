@@ -38,6 +38,7 @@ import random
 import re
 import secrets
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -1499,6 +1500,51 @@ def _get_aesthetic_info(aesthetic):
         }
 
 
+def _select_event_characters(characters, events, selected_ids=None):
+    """Keep always-present characters and people mentioned by the events."""
+    selected_ids = set(selected_ids or [])
+    candidates = list(characters)
+    event_text = _normalize_character_text(json.dumps(events, ensure_ascii=False))
+    selected = []
+
+    for character in candidates:
+        name = character.get("name", "")
+        normalized_name = _normalize_character_text(name)
+        name_parts = [part for part in normalized_name.split() if len(part) > 1]
+        always_present = character.get("always_present", False) is True
+        name_matches = any(
+            _contains_character_term(event_text, part) for part in name_parts
+        )
+
+        description = _normalize_character_text(character.get("description", ""))
+        family_terms = {
+            term for term in (
+                "papa", "pere", "father", "dad", "maman", "mere", "mother", "mom",
+                "parent", "parents", "frere", "soeur", "brother", "sister",
+                "fils", "fille", "son", "daughter",
+            )
+            if _contains_character_term(description, term)
+        }
+        family_matches = any(
+            _contains_character_term(event_text, term) for term in family_terms
+        )
+
+        is_selected = not selected_ids or character.get("id") in selected_ids
+        if always_present or (is_selected and (name_matches or family_matches)):
+            selected.append(character)
+
+    return selected
+
+
+def _normalize_character_text(value):
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(char for char in normalized if not unicodedata.combining(char)).lower()
+
+
+def _contains_character_term(text, term):
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", text))
+
+
 def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
                  mode="today", banner_text=None, characters_enabled=True,
                  weather=None, birthdays=None, aesthetic="whimsical",
@@ -1693,8 +1739,6 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             # Build age/gender description
             gender = person.get("gender", "male")
             age = person.get("age")
-            name = person.get("name", "Person")
-
             if gender == "male":
                 gender_word = "man" if (age and age >= 18) else "boy"
             elif gender == "female":
@@ -1704,12 +1748,14 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
 
             age_str = f", age {age}" if age else ""
             desc = (
-                f"{i+1}) A {gender_word} named {name}{age_str}. "
+                f"Character {i+1}: A {gender_word}{age_str}. "
                 f"{person.get('description', '')}"
             )
             char_descs.append(desc)
         for i, extra in enumerate(extras):
-            char_descs.append(f"{len(people)+i+1}) {extra['name']}. {extra.get('description', '')}")
+            char_descs.append(
+                f"Character {len(people)+i+1}: {extra.get('description', '')}"
+            )
 
         all_chars = "\n".join(char_descs)
 
@@ -1778,6 +1824,8 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             f"\n\nCHARACTERS (in the scene {char_area}): "
             f"Show these characters in the scene. Incorporate the day's activities "
             f"into the illustration when relevant and appropriate."
+            " Do NOT write, display, label, or caption any character names in the image. "
+            "Character numbers are internal references only and must not appear either."
             f"{clothing_note}"
             f"\nCHARACTERS:\n{all_chars}"
         )
@@ -1870,7 +1918,7 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
         aes_info = _get_aesthetic_info(aesthetic)
         
         layout_desc_parts = [
-            "LAYOUT & SPATIAL STRUCTURE (Grid coordinates: 12 columns × 8 rows):\n"
+            "LAYOUT & SPATIAL STRUCTURE (Grid coordinates: 12 columns × 8 rows - Do not draw any grid lines, reference marks, or column or row numbers):\n"
             f"The image is a single cohesive illustration. {scene_description} It must fill the entire 800×480 screen. "
             "It must seamlessly integrate the following textual widgets directly into the illustration at their specific grid positions, "
             "drawing them inside charming hand-drawn panels, signs, speech bubbles, or clean background spaces. "
@@ -2240,8 +2288,7 @@ def _generate_for_device(config: dict, force: bool = False):
     # ─── Load characters ────────────────────────────────────────
     characters = config.get("characters", [])
     selected_chars = config.get("selected_characters", [])
-    if selected_chars and len(selected_chars) > 0:
-        characters = [c for c in characters if c.get("id") in selected_chars]
+    characters = _select_event_characters(characters, events, selected_chars)
 
     # ─── Change detection ───────────────────────────────────────
     generation_hash = _compute_generation_hash(
@@ -2740,8 +2787,7 @@ def preview_prompt():
 
     characters = config.get("characters", [])
     selected_chars = config.get("selected_characters", [])
-    if selected_chars and len(selected_chars) > 0:
-        characters = [c for c in characters if c.get("id") in selected_chars]
+    characters = _select_event_characters(characters, events, selected_chars)
 
     prompt_template = config.get("prompt_template", "")
 

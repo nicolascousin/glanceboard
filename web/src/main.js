@@ -1377,12 +1377,14 @@ function openCharacterModal(existing) {
   $("#char-gender").value = existing?.gender || "male";
   $("#char-age").value = existing?.age || "";
   $("#char-birthday").value = existing?.birthday || "";
+  $("#char-always-present").checked = existing?.always_present === true;
   $("#char-description").value = existing?.description || "";
   // Show gender, age, birthday for people, hide for extras
   const showPersonFields = (existing?.type || (isPerson ? "kid" : "extra")) === "kid";
   $("#gender-group").style.display = showPersonFields ? "" : "none";
   $("#age-group").style.display = showPersonFields ? "" : "none";
   $("#birthday-group").style.display = showPersonFields ? "" : "none";
+  $("#always-present-group").style.display = showPersonFields ? "" : "none";
   $("#modal-delete").classList.toggle("hidden", !isEdit);
 
   // Image preview
@@ -1433,6 +1435,7 @@ $("#character-form").addEventListener("submit", async (e) => {
     gender: $("#char-gender").value,
     age: $("#char-age").value ? parseInt($("#char-age").value, 10) : null,
     birthday: $("#char-birthday").value || null,
+    always_present: charType === "kid" && $("#char-always-present").checked,
     description: $("#char-description").value.trim(),
   };
 
