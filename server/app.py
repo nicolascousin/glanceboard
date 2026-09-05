@@ -165,9 +165,11 @@ WMO_WEATHER_CODES = {
     99: ("Heavy thunderstorm with hail", "⛈️"),
 }
 
-DEFAULT_PROMPT_TEMPLATE = """Create a children's illustrated daily planner in pen-and-ink style on a clean white paper background with crosshatching. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+DEFAULT_PROMPT_TEMPLATE = """Write all texts in french
 
-CRITICAL FRAMING: Leave generous margins — at least 40 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
+Create a children's illustrated daily planner in pen-and-ink style on a clean white paper background with crosshatching. The output image MUST be EXACTLY 800×480 pixels — a wide landscape format (5:3 aspect ratio). The image MUST be significantly wider than it is tall.
+
+CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
 LAYOUT — FULL-WIDTH SCENE WITH OVERLAID TEXT:
 
