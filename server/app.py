@@ -1806,13 +1806,13 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
 
             age_str = f", age {age}" if age else ""
             desc = (
-                f"Character {i+1}: A {gender_word}{age_str}. "
+                f"A {gender_word}{age_str}. "
                 f"{person.get('description', '')}"
             )
             char_descs.append(desc)
         for i, extra in enumerate(extras):
             char_descs.append(
-                f"Character {len(people)+i+1}: {extra.get('description', '')}"
+                f"{extra.get('description', '')}"
             )
 
         all_chars = "\n".join(char_descs)
