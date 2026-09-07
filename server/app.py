@@ -2107,6 +2107,24 @@ Remember: 800×480 pixels, wide landscape, generous margins on all sides, white 
 
 # ─── Image Generation ───────────────────────────────────────────
 
+class ImageGenerationError(Exception):
+    """Raised when image generation fails after all retries.
+
+    Carries the provider's error message so it can be surfaced to the UI.
+    """
+
+
+def _extract_api_error_message(response):
+    """Pull a short human-readable message out of an API error response."""
+    try:
+        message = response.json().get("error", {}).get("message")
+        if message:
+            return message[:300]
+    except ValueError:
+        pass
+    return response.text[:300]
+
+
 def generate_image_via_openrouter(prompt, api_key, model, reference_image_urls=None):
     """Call OpenRouter's Image API to generate an image."""
     headers = {
@@ -2126,6 +2144,7 @@ def generate_image_via_openrouter(prompt, api_key, model, reference_image_urls=N
         ]
         print(f"Passing {len(reference_image_urls)} reference images to the model")
 
+    last_error = "No image returned by OpenRouter"
     for attempt in range(3):
         try:
             response = requests.post(
@@ -2134,20 +2153,28 @@ def generate_image_via_openrouter(prompt, api_key, model, reference_image_urls=N
                 json=payload,
                 timeout=240,
             )
-            if response.status_code == 429:
+            if response.status_code == 429 or response.status_code >= 500:
+                last_error = f"OpenRouter API error {response.status_code}: {_extract_api_error_message(response)}"
+                print(last_error)
                 time.sleep(5 * (attempt + 1))
                 continue
             if response.status_code != 200:
-                print(f"Image API error {response.status_code}: {response.text[:300]}")
+                last_error = f"OpenRouter API error {response.status_code}: {_extract_api_error_message(response)}"
+                print(last_error)
             response.raise_for_status()
             result = response.json()
             images = result.get("data", [])
             if images and images[0].get("b64_json"):
                 return base64.b64decode(images[0]["b64_json"])
+            last_error = "No image in OpenRouter response"
+        except requests.HTTPError as e:
+            # last_error already holds the response body detail captured above
+            print(f"Image generation error (attempt {attempt+1}): {e}")
         except Exception as e:
+            last_error = str(e)
             print(f"Image generation error (attempt {attempt+1}): {e}")
 
-    return None
+    raise ImageGenerationError(last_error)
 
 
 def generate_image_via_google_ai(prompt, api_key, model="gemini-3-pro-image", reference_image_urls=None):
@@ -2189,14 +2216,18 @@ def generate_image_via_google_ai(prompt, api_key, model="gemini-3-pro-image", re
         },
     }
 
+    last_error = "No image in Gemini response"
     for attempt in range(3):
         try:
             response = requests.post(url, json=payload, timeout=240)
-            if response.status_code == 429:
+            if response.status_code == 429 or response.status_code >= 500:
+                last_error = f"Gemini API error {response.status_code}: {_extract_api_error_message(response)}"
+                print(last_error)
                 time.sleep(5 * (attempt + 1))
                 continue
             if response.status_code != 200:
-                print(f"Gemini API error {response.status_code}: {response.text[:300]}")
+                last_error = f"Gemini API error {response.status_code}: {_extract_api_error_message(response)}"
+                print(last_error)
             response.raise_for_status()
 
             result = response.json()
@@ -2210,11 +2241,16 @@ def generate_image_via_google_ai(prompt, api_key, model="gemini-3-pro-image", re
                     if "inline_data" in part:
                         return base64.b64decode(part["inline_data"]["data"])
 
+            last_error = "No image in Gemini response"
             print(f"No image in Gemini response (attempt {attempt+1})")
+        except requests.HTTPError as e:
+            # last_error already holds the response body detail captured above
+            print(f"Gemini image generation error (attempt {attempt+1}): {e}")
         except Exception as e:
+            last_error = str(e)
             print(f"Gemini image generation error (attempt {attempt+1}): {e}")
 
-    return None
+    raise ImageGenerationError(last_error)
 
 
 # ─── Image Processing ───────────────────────────────────────────
@@ -2456,17 +2492,20 @@ def _generate_for_device(config: dict, force: bool = False):
     # ─── Generate image (route to correct provider) ──────────────
     refs = reference_urls if reference_urls else None
 
-    if api_provider == "openrouter":
-        # OpenRouter models need the 'google/' prefix
-        or_model = model if "/" in model else f"google/{model}"
-        print(f"  Using OpenRouter: {or_model}")
-        img_bytes = generate_image_via_openrouter(prompt, api_key, or_model, reference_image_urls=refs)
-    else:
-        # Google AI Studio (default)
-        # Strip 'google/' prefix if present
-        gemini_model = model.replace("google/", "") if model.startswith("google/") else model
-        print(f"  Using Google AI Studio: {gemini_model}")
-        img_bytes = generate_image_via_google_ai(prompt, api_key, gemini_model, reference_image_urls=refs)
+    try:
+        if api_provider == "openrouter":
+            # OpenRouter models need the 'google/' prefix
+            or_model = model if "/" in model else f"google/{model}"
+            print(f"  Using OpenRouter: {or_model}")
+            img_bytes = generate_image_via_openrouter(prompt, api_key, or_model, reference_image_urls=refs)
+        else:
+            # Google AI Studio (default)
+            # Strip 'google/' prefix if present
+            gemini_model = model.replace("google/", "") if model.startswith("google/") else model
+            print(f"  Using Google AI Studio: {gemini_model}")
+            img_bytes = generate_image_via_google_ai(prompt, api_key, gemini_model, reference_image_urls=refs)
+    except ImageGenerationError as e:
+        return {"success": False, "error": str(e)}
 
     if not img_bytes:
         return {"success": False, "error": "Image generation failed"}
@@ -2761,7 +2800,8 @@ def generate_now(force: bool = False):
     elif result and result.get("skipped"):
         return result
     else:
-        raise HTTPException(status_code=500, detail="Generation failed")
+        detail = (result or {}).get("error") or "Generation failed"
+        raise HTTPException(status_code=500, detail=detail)
 
 @app.get("/api/status")
 def get_status():
