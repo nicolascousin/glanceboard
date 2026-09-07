@@ -1882,7 +1882,7 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             f"\n\nCHARACTERS (in the scene {char_area}): "
             f"Show these characters in the scene. Incorporate the day's activities "
             f"into the illustration when relevant and appropriate."
-            " Do NOT write, display, label, or caption any character names in the image. "
+            " Do NOT write, display, label, or caption any character names or ages in the image. "
             "Character numbers are internal references only and must not appear either."
             f"{clothing_note}"
             f"\nCHARACTERS:\n{all_chars}"
