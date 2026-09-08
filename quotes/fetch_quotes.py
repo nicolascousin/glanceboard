@@ -16,15 +16,10 @@ OUTPUTS = [
 
 THEME_KEYWORDS = {
     "humour": {"funny", "laugh", "humor", "joke", "ridiculous", "comedy"},
-    "courage": {"brave", "courage", "fear", "bold", "dare"},
     "curiosite": {"curious", "question", "learn", "knowledge", "wonder"},
     "amitie": {"friend", "friendship", "together", "love", "kindness"},
-    "perseverance": {"success", "failure", "persist", "work", "try"},
     "creativite": {"create", "creativity", "imagination", "art", "idea", "dream"},
-    "famille": {"family", "parent", "child", "home", "mother", "father"},
-    "ecole": {"school", "teacher", "education", "book", "study"},
-    "animaux": {"dog", "cat", "bird", "animal", "horse", "fish"},
-    "inspiration": {"dream", "life", "hope", "future", "change", "believe"},
+    "famille": {"family", "parent", "child", "home", "mother", "father"}
 }
 
 
