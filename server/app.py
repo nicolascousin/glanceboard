@@ -114,6 +114,16 @@ BACKUP_QUOTES = [
 
 QUOTE_FILE = Path(__file__).resolve().parent.parent / "quotes" / "quotes.json"
 
+# Per-event scene override tag, e.g. a calendar event description containing:
+#   [SCENE: a cozy candlelit birthday party with balloons and a big cake]
+# replaces the auto-generated weather scene for that day's illustration.
+SCENE_OVERRIDE_PATTERN = re.compile(r"\[scene:\s*(.+?)\]", re.IGNORECASE | re.DOTALL)
+
+
+def _extract_scene_override(text):
+    match = SCENE_OVERRIDE_PATTERN.search(text or "")
+    return match.group(1).strip() if match else None
+
 
 def load_quote_catalog():
     try:
@@ -271,12 +281,15 @@ def _fetch_events_ical(ical_url, range_start, range_end, timezone):
                     end_iso = dt_end.isoformat()
 
             location = str(component.get("location", "") or "")
+            description = str(component.get("description", "") or "")
+            scene_override = _extract_scene_override(description)
             events.append({
                 "summary": summary,
                 "start": start_str,
                 "start_iso": start_iso,
                 "end_time": end_iso,
                 "location": location,
+                "scene_override": scene_override,
             })
 
         events.sort(key=lambda e: e.get("start", ""))
@@ -1145,7 +1158,10 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
     """
     event_keys = []
     for ev in (events or []):
-        event_keys.append(f"{ev.get('calendar_id', '')}|{ev.get('start', '')}|{ev.get('summary', '')}")
+        event_keys.append(
+            f"{ev.get('calendar_id', '')}|{ev.get('start', '')}|{ev.get('summary', '')}"
+            f"|{ev.get('scene_override', '')}"
+        )
     event_keys.sort()
 
     character_keys = []
@@ -1616,8 +1632,17 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
     now = datetime.now(tz)
     raw_season = get_season(now.month)
 
+    # A per-event scene override (see SCENE_OVERRIDE_PATTERN) always wins —
+    # it lets a specific event (e.g. a themed birthday) replace the default scene.
+    event_scene_override = next(
+        (ev.get("scene_override") for ev in (events or []) if ev.get("scene_override")),
+        None,
+    )
+
+    if event_scene_override:
+        scene_description = event_scene_override
     # Use Gemini-generated scene description if available, otherwise fall back
-    if not scene_description:
+    elif not scene_description:
         if weather and weather.get("temp") is not None:
             temp = weather["temp"]
             unit = weather.get("unit_symbol", "°C")
@@ -2427,8 +2452,14 @@ def _generate_for_device(config: dict, force: bool = False):
     # ─── Scene description via text model ───────────────────────
     # Instead of just "winter scene" (which draws snow in Sydney),
     # use the text model to generate a realistic, location-aware description.
+    # A per-event [SCENE: ...] override takes priority and skips this call.
     scene_description = ""
-    if weather:
+    event_scene_override = next(
+        (ev.get("scene_override") for ev in events if ev.get("scene_override")), None
+    )
+    if event_scene_override:
+        print(f"  🎬 Using custom scene from event: {event_scene_override}")
+    elif weather:
         raw_season = get_season(now.month)
         scene_description = describe_scene_weather_via_gemini(
             weather, raw_season, timezone, api_key,
