@@ -199,7 +199,7 @@ CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on AL
 
 LAYOUT — FULL-WIDTH SCENE WITH OVERLAID TEXT:
 
-The ENTIRE image is a single elegant fashion illustration. {{SCENE_DESCRIPTION}} Think high-fashion editorial meets daily planner — loose, confident brush strokes and fine ink lines on a clean white background.
+The ENTIRE image is a single elegant fashion illustration. {{SCENE_DESCRIPTION}} Think high-fashion editorial meets daily planner — loose, confident brush strokes and fine ink lines on a clean white background. The scene fills the whole canvas.
 
 TOP: An elegant hand-lettered header reads: '{{BANNER_TEXT}}' in stylish calligraphic or modern serif letters. Keep it well below the top edge.
 
