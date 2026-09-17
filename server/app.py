@@ -1608,6 +1608,25 @@ def _select_event_characters(characters, events, selected_ids=None):
         if always_present or (is_selected and (name_matches or family_matches)):
             selected.append(character)
 
+    character_names = {
+        _normalize_character_text(character.get("name", ""))
+        for character in candidates
+    }
+    poupette = next(
+        (
+            character for character in candidates
+            if character.get("type") == "extra"
+            and _normalize_character_text(character.get("name", "")) == "poupette"
+        ),
+        None,
+    )
+    if (
+        {"philippe", "edith"}.issubset(character_names)
+        and poupette is not None
+        and poupette not in selected
+    ):
+        selected.append(poupette)
+
     return selected
 
 
