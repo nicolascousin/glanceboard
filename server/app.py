@@ -547,6 +547,7 @@ Rules:
 - If the location is known, use regionally appropriate vegetation (e.g. eucalyptus and gum trees for Australia, not oak and pine)
 - Keep it to 1-2 SHORT sentences describing just the atmosphere and setting
 - Do NOT mention specific people or characters
+- Do NOT add speech bubbles near the characters (do not write, display, label, or caption any character names, ages, height, weight in the image).
 
 Example outputs:
 - "A mild, cool winter morning{location_ctx} with grey overcast skies and green trees. The light is soft and gentle."
@@ -1907,7 +1908,7 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             f"\n\nCHARACTERS (in the scene {char_area}): "
             f"Show these characters in the scene. Incorporate the day's activities "
             f"into the illustration when relevant and appropriate."
-            " Do NOT write, display, label, or caption any character names or ages in the image. "
+            " Do NOT write, display, label, or caption any character names, ages, height, weight in the image. "
             "Character numbers are internal references only and must not appear either."
             f"{clothing_note}"
             f"\nCHARACTERS:\n{all_chars}"
