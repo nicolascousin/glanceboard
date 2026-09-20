@@ -705,7 +705,11 @@ Output strictly as a valid JSON object:
     "Record-breaking coral reef recovery observed in the Great Barrier Reef"
   ]
 }
-Do NOT wrap in markdown code blocks. Output raw JSON only."""
+Do NOT wrap in markdown code blocks. Output raw JSON only.
+DO NOT hallucinate facts. Output only accurate historical information based on today's date.
+Text on upper example in history and news attributes are for illustration purposes only. Search news on science, technology, and world events for recent headlines.
+For history, search an historical event that occurred on today's date in any year.
+"""
     
     try:
         tm = text_model or DEFAULT_TEXT_MODEL
