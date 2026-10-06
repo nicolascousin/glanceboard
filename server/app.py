@@ -46,7 +46,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import requests
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Header
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from PIL import Image
@@ -1625,7 +1625,7 @@ def _select_event_characters(characters, events, selected_ids=None):
         None,
     )
     if (
-        {"philippe", "edith"}.issubset(character_names)
+        {"philippe", "edith"}.issubset(selected)
         and poupette is not None
         and poupette not in selected
     ):
@@ -1648,7 +1648,7 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
                  weather=None, birthdays=None, aesthetic="whimsical",
                  scene_description="", important_events=None,
                  location_name="", layout_placements=None, widget_configs=None,
-                 widget_data=None):
+                 widget_data=None, battery_percentage=None):
     """
     Build the image generation prompt from events + characters + weather + countdowns.
     """
@@ -1967,6 +1967,18 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             f"stamp on the illustration."
         )
 
+    # ─── SECTION BATTERIE (Alerte si < 20%) ─────────────────────────
+    battery_section = ""
+    if battery_percentage is not None and battery_percentage < 20:
+        battery_section = (
+            f"\nBATTERY WARNING WIDGET:\n"
+            f"- Display a small, subtle battery alert widget in the corner or edge margin.\n"
+            f"- Text to display: '⚠️ Low Battery ({battery_percentage}%)' or '🔋 {battery_percentage}%'.\n"
+            f"- Keep it fully aligned with the chosen illustration style (hand-drawn pen-and-ink or sketch style, "
+            f"using black ink with red/yellow accent for the warning).\n"
+            f"- It must look like a natural hand-drawn element of the daily planner layout.\n"
+        )
+
     # ─── Dynamic text layout based on event count ─────────────────
     # Adapt the left-side text area so a few events don't leave a huge
     # blank column. With many events the text panel is wider; with few
@@ -2147,6 +2159,9 @@ Remember: 800×480 pixels, wide landscape, generous margins on all sides, white 
         prompt = prompt.replace("{{WEATHER}}", weather_section)
         prompt = prompt.replace("{{COUNTDOWN}}", countdown_text)
         prompt = prompt.replace("{{REGION_GUIDANCE}}", region_guidance)
+
+        if battery_section:
+            prompt += f"\n{battery_section}"
 
     # This instruction is invariant across custom, aesthetic, and layout prompts.
     prompt = "Write all texts in french\n\n" + prompt
@@ -2444,13 +2459,17 @@ def _generate_for_device(config: dict, force: bool = False):
         characters=characters,
     )
 
+    status_dict = config.get("status", {})
+
     if not force:
-        status_dict = config.get("status", {})
         last_hash = status_dict.get("last_generation_hash", "")
         if last_hash == generation_hash:
             return {"skipped": True, "hash": generation_hash}
 
     print(f"  🎨 Changes detected (hash={generation_hash}), generating new image...")
+
+
+    battery_percentage = status_dict.get("battery_percentage")
 
     prompt_template = config.get("prompt_template", "")
 
@@ -2535,6 +2554,7 @@ def _generate_for_device(config: dict, force: bool = False):
         layout_placements=layout_placements,
         widget_configs=widget_configs,
         widget_data=widget_data,
+        battery_percentage=battery_percentage,
     )
 
     # Collect reference images
@@ -2867,17 +2887,33 @@ def get_status():
 # ─── Device-facing endpoints (for PhotoPainter / e-ink display) ──
 
 @app.get("/api/display")
-def get_display_image(format: str = "png"):
-    """
-    Returns the latest display image for the e-ink device.
-    The PhotoPainter custom firmware should poll this URL.
-    
+def get_display_image(
+    request: Request,
+    format: str = "png",
+    x_battery_percentage: str = Header(None, alias="X-Battery-Percentage")
+):
+    """ Returns the latest display image for the e-ink device. The PhotoPainter custom firmware should poll this URL.
+
     Query params:
       - format: "png" (default) or "bmp"
-    
+
     Usage: Point your PhotoPainter firmware at:
       http://<your-server>:8000/api/display
     """
+    # Enregistrement du niveau de batterie reçu dans le header
+    battery_val = x_battery_percentage or request.headers.get("x-battery-percentage")
+    if battery_val is not None:
+        try:
+            battery_pct = int(battery_val)
+            config = load_config()
+            if "status" not in config:
+                config["status"] = {}
+            config["status"]["battery_percentage"] = battery_pct
+            config["status"]["battery_last_updated"] = datetime.now().isoformat()
+            save_config(config)
+        except ValueError:
+            pass
+
     from fastapi.responses import FileResponse
     
     dithered = "data/images/latest_display_dithered.png"
