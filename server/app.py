@@ -1152,9 +1152,7 @@ def _determine_mode_and_events(hour, today_events, tomorrow_events, timezone):
                 banner = "GOOD EVENING!"
             return "today", banner, []
 
-
-def _compute_generation_hash(mode, banner_text, events, weather_summary="", weather=None,
-                             characters=None):
+def _compute_generation_hash(mode, banner_text, events, weather_summary="", weather=None, characters=None, battery_percentage=None):
     """Compute a hash of the generation inputs to detect changes.
 
     Only regenerate when this hash differs from the last generation.
@@ -1204,12 +1202,16 @@ def _compute_generation_hash(mode, banner_text, events, weather_summary="", weat
                 f"{label}:{gust}" for label, gust in weather.get("wind_gust_alert_windows", [])
             )
 
+    # Indiquer si l'alerte batterie est active (ex: True si < 20%) pour éviter de redéclencher à chaque % de perte de batterie
+    battery_alert = (battery_percentage is not None and battery_percentage < 20)
+
     hash_input = json.dumps({
         "mode": mode,
         "banner": banner_text,
         "events": event_keys,
         "characters": character_keys,
         "weather": coarse_weather,
+        "battery_alert": battery_alert,  # <-- Ajouté au hash
     }, sort_keys=True)
 
     return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
@@ -2460,7 +2462,7 @@ def _generate_for_device(config: dict, force: bool = False):
     # ─── Change detection ───────────────────────────────────────
     generation_hash = _compute_generation_hash(
         mode, banner_text, events, weather_summary, weather=weather,
-        characters=characters,
+        characters=characters, battery_percentage=battery_percentage
     )
 
     status_dict = config.get("status", {})
@@ -2622,7 +2624,11 @@ def _generate_for_device(config: dict, force: bool = False):
         if weather.get("wind_gust_alert_needed"):
             status_data["wind_gust_alert_windows"] = weather.get("wind_gust_alert_windows", [])
 
-    config["status"] = status_data
+    if "status" not in config:
+        config["status"] = {}
+
+    # Mettre à jour les clés du statut sans supprimer les clés existantes (comme battery_percentage)
+    config["status"].update(status_data)
 
     return {
         "success": True,
