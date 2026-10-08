@@ -1624,8 +1624,12 @@ def _select_event_characters(characters, events, selected_ids=None):
         ),
         None,
     )
+    selected_names = {
+        _normalize_character_text(char.get("name", ""))
+        for char in selected
+    }
     if (
-        {"philippe", "edith"}.issubset(selected)
+        {"philippe", "edith"}.issubset(selected_names)
         and poupette is not None
         and poupette not in selected
     ):
