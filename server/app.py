@@ -2158,6 +2158,10 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
 
 CRITICAL FRAMING: Leave generous margins — at least 20 pixels of padding on ALL sides (top, bottom, left, right). Do NOT place any text, characters, or important elements near the edges. Everything must be well within the safe zone to avoid clipping on the e-ink display.
 
+CRITICAL ABSOLUTE CONSTRAINTS / NEGATIVE PROMPT:
+    - Do NOT draw any grid lines, coordinate systems, reference ticks, or alignment markers.
+    - Do NOT draw any numbers along the outer edges, margins, top, bottom, left, or right border of the image.
+
 {dynamic_layout_desc}
 
 {aes_info['style_rules']}
