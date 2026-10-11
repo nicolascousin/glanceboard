@@ -40,6 +40,7 @@ import secrets
 import time
 import unicodedata
 from datetime import date, datetime, timedelta
+import locale
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -67,6 +68,19 @@ GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 DEFAULT_TEXT_MODEL = "gemini-flash-latest"
+
+# ─── Configuration de la locale en français pour obtenir le jour en toutes lettres ───
+try:
+    locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")
+except Exception:
+    pass
+
+def get_formatted_banner_date() -> str:
+    """Retourne la date au format '<jour en toutes lettres> JJ/MM' (ex: 'Lundi 12/10')."""
+    now = datetime.now()
+    day_name = now.strftime("%A").capitalize()  # Ex: "Lundi"
+    date_str = now.strftime("%d/%m")            # Ex: "12/10"
+    return f"{day_name} {date_str}"
 
 # ─── Optional Gmail Integration ────────────────────────────────
 # These dependencies are optional — install via: pip install -r requirements-email.txt
@@ -1718,6 +1732,9 @@ def build_prompt(events, characters, prompt_template, timezone=DEFAULT_TIMEZONE,
             banner_text = f"WHAT'S ON TOMORROW ({day_name.upper()})"
         else:
             banner_text = f"THIS {day_name.upper()}'S ADVENTURE!"
+
+    banner_date = get_formatted_banner_date()
+    banner_text = f"{banner_date} - {banner_text}"
 
     # Build event list — prefer Gemini-humanized text when available
     event_list_items = []
