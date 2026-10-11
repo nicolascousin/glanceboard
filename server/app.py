@@ -2459,13 +2459,15 @@ def _generate_for_device(config: dict, force: bool = False):
     selected_chars = config.get("selected_characters", [])
     characters = _select_event_characters(characters, events, selected_chars)
 
+
+    battery_percentage = status_dict.get("battery_percentage")
+    status_dict = config.get("status", {})
+    
     # ─── Change detection ───────────────────────────────────────
     generation_hash = _compute_generation_hash(
         mode, banner_text, events, weather_summary, weather=weather,
         characters=characters, battery_percentage=battery_percentage
     )
-
-    status_dict = config.get("status", {})
 
     if not force:
         last_hash = status_dict.get("last_generation_hash", "")
@@ -2473,9 +2475,6 @@ def _generate_for_device(config: dict, force: bool = False):
             return {"skipped": True, "hash": generation_hash}
 
     print(f"  🎨 Changes detected (hash={generation_hash}), generating new image...")
-
-
-    battery_percentage = status_dict.get("battery_percentage")
 
     prompt_template = config.get("prompt_template", "")
 
