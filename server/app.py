@@ -2460,8 +2460,8 @@ def _generate_for_device(config: dict, force: bool = False):
     characters = _select_event_characters(characters, events, selected_chars)
 
 
-    battery_percentage = status_dict.get("battery_percentage")
     status_dict = config.get("status", {})
+    battery_percentage = status_dict.get("battery_percentage")
     
     # ─── Change detection ───────────────────────────────────────
     generation_hash = _compute_generation_hash(
